@@ -2,7 +2,7 @@
 
 Semantic source wrapping for LaTeX, using `latexindent.pl` for sentence detection
 and protected regions. The CLI and wrapping policy follow the companion
-[`../md-lint`](../md-lint) project.
+[`mdformat-semantic-wrap`](https://github.com/nickfraser/mdformat-semantic-wrap) project.
 
 Each detected sentence starts on its own source line. Short sentences stay
 together; longer sentences prefer punctuation near a soft width, with a separate
@@ -57,7 +57,7 @@ under a different interpreter is not sufficient.
 
 ## Format and check
 
-Like `md-lint`, file inputs are **formatted in place by default**:
+Like `mdformat-semantic-wrap`, file inputs are **formatted in place by default**:
 
 ```bash
 bin/tex-lint document.tex
