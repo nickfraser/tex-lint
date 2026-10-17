@@ -1,0 +1,208 @@
+#!/usr/bin/env perl
+use strict;
+use warnings;
+use Cwd qw(abs_path getcwd);
+use File::Basename qw(dirname);
+use lib dirname(dirname(abs_path(__FILE__))) . '/lib';
+use Getopt::Long qw(GetOptions Configure);
+use File::Spec;
+use File::Temp qw(tempdir);
+use File::Path qw(make_path);
+use Encode qw(decode encode FB_CROAK);
+use TexLint::Config;
+
+sub help {
+    print <<'HELP';
+Usage: tex-lint [OPTIONS] PATH [PATH ...]
+Format LaTeX files in place; directories are searched recursively for *.tex.
+Use - to read UTF-8 stdin and write formatted text to stdout.
+
+  --check                             Report differences without editing (exit 1)
+  --semantic-wrap-soft-width N         Soft display-column target (default: 80)
+  --semantic-wrap-hard-width N         Hard breakable width (default: 100)
+  --semantic-wrap-preferred-markers S  Punctuation characters (default: ,;:-–—)
+  --semantic-wrap-continuation-indent N  Extra continuation spaces (default: 0)
+  --config PATH                       Explicit .latexindent.yaml settings
+  --latexindent PATH                  latexindent Perl script (or LATEXINDENT)
+  -o, --output PATH                   Separate output; - means stdout (one input)
+  -h, --help                          Show this help
+  --version                           Show formatter version
+
+CLI settings override semantic_wrap in the nearest .latexindent.yaml.
+Errors exit 2. Indivisible words/macros may exceed the hard width.
+HELP
+}
+
+sub read_bytes {
+    my ($path) = @_;
+    open my $fh, '<:raw', $path or die "Cannot read $path: $!\n";
+    local $/;
+    return <$fh> // '';
+}
+
+sub write_bytes {
+    my ($path, $bytes) = @_;
+    open my $fh, '>:raw', $path or die "Cannot write $path: $!\n";
+    print {$fh} $bytes or die "Cannot write $path: $!\n";
+    close $fh or die "Cannot close $path: $!\n";
+}
+
+sub backend_path {
+    my ($requested) = @_;
+    my @names = defined($requested) ? ($requested) : ('latexindent', 'latexindent.pl');
+    for my $name (@names) {
+        my @paths = $name =~ m{/} ? ($name) : map { File::Spec->catfile($_, $name) } File::Spec->path;
+        for my $path (@paths) {
+            next unless -f $path && -r $path && (-x $path || defined $requested);
+            return abs_path($path);
+        }
+    }
+    die "latexindent is unavailable. Add TeX Live's bin directory to PATH, or pass\n"
+        . "--latexindent /path/to/latexindent.pl (LATEXINDENT is also supported).\n";
+}
+
+sub collect_files {
+    my ($path, $files, $seen, $explicit) = @_;
+    die "Input does not exist: $path\n" unless -e $path;
+    if (-d $path) {
+        return if -l $path && !$explicit;
+        opendir my $dir, $path or die "Cannot read directory $path: $!\n";
+        my @entries = sort grep { $_ ne '.' && $_ ne '..' } readdir $dir;
+        closedir $dir;
+        for my $entry (@entries) {
+            my $child = File::Spec->catfile($path, $entry);
+            next if -d $child && ($entry =~ /^\./ || $entry =~ /\A(?:venv|env|node_modules)\z/);
+            next if !-d $child && $child !~ /\.tex\z/;
+            collect_files($child, $files, $seen, 0);
+        }
+    } elsif (-f $path) {
+        my $absolute = abs_path($path);
+        push @$files, $absolute unless $seen->{$absolute}++;
+    } else {
+        die "Not a regular file: $path\n";
+    }
+}
+
+sub find_settings {
+    my ($start) = @_;
+    my $dir = $start;
+    while (1) {
+        my $path = File::Spec->catfile($dir, '.latexindent.yaml');
+        return $path if -f $path;
+        my $parent = dirname($dir);
+        return if $parent eq $dir;
+        $dir = $parent;
+    }
+}
+
+sub run_worker {
+    my ($stdout_path, @args) = @_;
+    my $pid = fork();
+    die "Cannot start latexindent worker: $!\n" unless defined $pid;
+    if (!$pid) {
+        open STDOUT, '>:raw', $stdout_path or die "Cannot capture worker output: $!\n";
+        exec {$^X} @args;
+        die "Cannot execute latexindent worker: $!\n";
+    }
+    waitpid($pid, 0);
+    return $?;
+}
+
+sub main {
+    Configure('no_auto_abbrev', 'no_ignore_case');
+    my (%options, %overrides);
+    GetOptions(
+        'check' => \$options{check}, 'help|h' => \$options{help}, 'version' => \$options{version},
+        'config=s' => \$options{config}, 'latexindent=s' => \$options{backend},
+        'output|o=s' => \$options{output},
+        'semantic-wrap-soft-width=s' => \$overrides{soft_width},
+        'semantic-wrap-hard-width=s' => \$overrides{hard_width},
+        'semantic-wrap-preferred-markers=s' => \$overrides{preferred_markers},
+        'semantic-wrap-continuation-indent=s' => \$overrides{continuation_indent},
+    ) or die "Use --help for usage.\n";
+    if ($options{help}) { help(); return 0; }
+    if ($options{version}) { print "tex-lint 0.1.0\n"; return 0; }
+    die "Provide at least one input path, or - for stdin.\n" unless @ARGV;
+    die "--check and --output cannot be combined.\n" if $options{check} && defined $options{output};
+    %overrides = map { $_ => $overrides{$_} } grep { defined $overrides{$_} } keys %overrides;
+    # Validate individual overrides now, but compare widths only after merging
+    # with the project's settings in the worker.
+    for my $key (keys %overrides) {
+        my %validation = ($key => $overrides{$key});
+        $validation{preferred_markers} = decode('UTF-8', $validation{preferred_markers}, FB_CROAK)
+            if $key eq 'preferred_markers';
+        if ($key eq 'soft_width' || $key eq 'hard_width') {
+            $validation{soft_width} = $validation{hard_width} = $overrides{$key};
+        }
+        TexLint::Config->new(%validation);
+    }
+    die "semantic_wrap.soft_width must not exceed hard_width\n"
+        if exists($overrides{soft_width}) && exists($overrides{hard_width})
+            && $overrides{soft_width} > $overrides{hard_width};
+    my (@files, %seen);
+    if (grep { $_ eq '-' } @ARGV) {
+        die "Stdin (-) must be the only input.\n" unless @ARGV == 1;
+        @files = ('-');
+    } else {
+        collect_files($_, \@files, \%seen, 1) for @ARGV;
+    }
+    die "--output requires exactly one input file.\n" if defined($options{output}) && @files != 1;
+    return 0 unless @files;
+    if (defined $options{config}) {
+        die "Configuration is not a readable file: $options{config}\n" unless -f $options{config} && -r _;
+        $options{config} = abs_path($options{config});
+    }
+    my $backend = backend_path($options{backend} // $ENV{LATEXINDENT});
+    my $root = getcwd();
+    my $scratch_root = File::Spec->catdir($root, '.ocs', 'tex-lint');
+    make_path($scratch_root);
+    my $scratch = tempdir('run-XXXXXXXX', DIR => $scratch_root, CLEANUP => 1);
+    my $worker = dirname(dirname(abs_path(__FILE__))) . '/libexec/tex-lint-worker.pl';
+    my @results;
+    my $count = 0;
+    for my $file (@files) {
+        my $before;
+        if ($file eq '-') { local $/; binmode STDIN, ':raw'; $before = <STDIN> // ''; }
+        else { $before = read_bytes($file); }
+        decode('UTF-8', $before, FB_CROAK | Encode::LEAVE_SRC);
+        # Always give upstream a scratch copy, never an original to overwrite.
+        my $input = "$scratch/input-" . ++$count . '.tex';
+        my $output = "$scratch/output-$count.tex";
+        write_bytes($input, $before);
+        my $settings = $options{config} // find_settings($file eq '-' ? $root : dirname($file));
+        my @args = ($^X, $worker, '--backend', $backend, '--input', $input,
+            '--output', $output, '--scratch', $scratch);
+        push @args, ('--settings', $settings) if defined $settings;
+        for my $key (sort keys %overrides) {
+            (my $flag = $key) =~ s/_/-/g;
+            push @args, "--semantic-wrap-$flag", $overrides{$key};
+        }
+        my $worker_stdout = "$scratch/worker-$count.stdout";
+        my $status = run_worker($worker_stdout, @args);
+        if ($status != 0) {
+            my $details = -f $worker_stdout ? read_bytes($worker_stdout) : '';
+            die "latexindent failed for $file (worker status $status).\n$details";
+        }
+        die "latexindent produced no output for $file.\n" unless -f $output;
+        push @results, [$file, $before, read_bytes($output)];
+    }
+    my $different = 0;
+    for my $result (@results) {
+        my ($file, $before, $after) = @$result;
+        if ($options{check}) {
+            if ($before ne $after) { print STDERR "Would reformat: $file\n"; $different = 1; }
+        } elsif (defined($options{output}) && $options{output} ne '-') {
+            write_bytes($options{output}, $after);
+        } elsif ($file eq '-' || (defined($options{output}) && $options{output} eq '-')) {
+            binmode STDOUT, ':raw'; print $after;
+        } elsif ($before ne $after) {
+            die "Input changed during formatting: $file\n" if read_bytes($file) ne $before;
+            write_bytes($file, $after);
+        }
+    }
+    return $different;
+}
+
+my $status = eval { main() };
+if ($@) { print STDERR "tex-lint: $@"; exit 2; }
+exit $status;

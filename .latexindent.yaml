@@ -1,0 +1,18 @@
+semantic_wrap:
+  soft_width: 80
+  hard_width: 100
+  preferred_markers: ',;:-–—'
+  continuation_indent: 0
+
+defaultIndent: '    '
+
+modifyLineBreaks:
+  oneSentencePerLine:
+    manipulateSentences: 1
+    removeSentenceLineBreaks: 1
+    textWrapSentences: 1
+    sentenceIndent: ''
+  textWrapOptions:
+    columns: 100
+    when: after
+    huge: overflow

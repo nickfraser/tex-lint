@@ -1,0 +1,31 @@
+\documentclass{article}
+\usepackage{amsmath}
+\usepackage{hyperref}
+\newcommand{\example}[1]{#1}
+\begin{document}
+First sentence. Second sentence, with enough ordinary words to demonstrate punctuation wrapping near a soft target and a separate hard limit.
+
+A sentence with \textbf{bold words, punctuation. And another phrase} and \href{https://example.test/a,b}{a link label} stays well formed.
+
+Inline math $a, b; c = 1.25$ and \(x, y = 2.5\) remains atomic in this sufficiently long sentence, with more prose after it.
+
+\begin{equation}
+  a, b = c + d \quad \text{Do not wrap. This is math.}
+\end{equation}
+
+\begin{verbatim}
+    A verbatim sentence. Another, sentence; stays: exactly as written.
+\end{verbatim}
+
+Text before% keep this comment exactly
+joined text. Another sentence.
+
+An explicit line break\\
+continues here. Next sentence.
+
+\begin{itemize}
+\item First item sentence. Another item sentence, with enough words to wrap at a suitable punctuation boundary.
+\end{itemize}
+
+Ordinary prose with more words, followed by a final sentence.
+\end{document}
