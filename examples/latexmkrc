@@ -1,0 +1,12 @@
+# Run from the repository root:
+# latexmk -norc -r examples/latexmkrc -lualatex examples/README.tex
+use Cwd qw(getcwd);
+use File::Path qw(make_path);
+
+$out_dir = '.ocs/examples';
+my $cache_root = getcwd() . '/' . $out_dir;
+$ENV{TEXMFVAR} = "$cache_root/texmf-var";
+$ENV{TEXMFCONFIG} = "$cache_root/texmf-config";
+$ENV{TEXMFCACHE} = $ENV{TEXMFVAR};
+make_path($out_dir, $ENV{TEXMFVAR}, $ENV{TEXMFCONFIG});
+$lualatex = 'lualatex -interaction=nonstopmode -halt-on-error -file-line-error -no-shell-escape -synctex=0 %O %S';

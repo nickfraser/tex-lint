@@ -22,11 +22,13 @@ if (!$ENV{TEX_LINT_COMPILE}) {
     write_text($settings, "semantic_wrap:\n  soft_width: 40\n  hard_width: 55\ndefaultIndent: '    '\nverbatimEnvironments:\n  linewise: 1\n");
     my %results;
     for my $engine (qw(pdflatex lualatex)) {
-        for my $fixture (qw(protected prose structures references whitespace unicode)) {
-            next if $fixture eq 'unicode' && $engine eq 'pdflatex';
+        for my $fixture (qw(protected prose structures references whitespace unicode readme)) {
+            next if ($fixture eq 'unicode' || $fixture eq 'readme') && $engine eq 'pdflatex';
             my $case = "$artifacts/$engine-$fixture";
             make_path("$case/original", "$case/formatted");
-            my $source = read_text("$TexLintTest::root/tests/fixtures/$fixture.tex");
+            my $source_path = $fixture eq 'readme' ? "$TexLintTest::root/examples/README.tex"
+                : "$TexLintTest::root/tests/fixtures/$fixture.tex";
+            my $source = read_text($source_path);
             my ($status, $formatted, $err) = run_cli($case, $source,
                 '--latexindent', $backend, '--config', $settings, '-');
             die "Cannot format $fixture for compilation:\n$err" if $status;

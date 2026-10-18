@@ -23,7 +23,7 @@ or use `perl bin/tex-lint`.
 
 **Verified integration:** `latexindent` **3.24.7**, `latexmk` **4.87**, TeX Live
 **2025** (pdfLaTeX and LuaLaTeX), and Poppler **25.07.0**. The full suite passes
-**310 assertions**, including 11 original/formatted fixture pairs with identical
+**319 assertions**, including 12 original/formatted document pairs with identical
 extracted text, page geometry, and page rasters at 96 dpi. Tests also verify
 source idempotence and resolved bibliography/cross-references.
 
@@ -96,6 +96,30 @@ Exit statuses:
 
 Check-mode reports go to stderr. `--check -` compares stdin without emitting
 formatted text. `--check` and `--output` cannot be combined.
+
+## LaTeX README demonstration
+
+[`examples/README.tex`](examples/README.tex) is a maintained LaTeX edition of this
+guide and a substantial formatting demonstration. Its source uses the project's
+default 80/100 widths, with protected code examples, hyperlinks, lists, and a
+table. Run these commands from the repository root to check it and build a PDF
+with LuaLaTeX:
+
+```bash
+bin/tex-lint --check examples/README.tex
+latexmk -norc -r examples/latexmkrc -lualatex examples/README.tex
+```
+
+The PDF is written to `.ocs/examples/README.pdf`. The example's `latexmkrc` also
+keeps auxiliary files and TeX/font caches under `.ocs/examples/`. After building,
+preview formatting on a separate copy with:
+
+```bash
+bin/tex-lint --output .ocs/examples/README-formatted.tex examples/README.tex
+```
+
+The compilation suite additionally reformats the example at 40/55 widths and
+checks that its PDF text, geometry, and rendered pixels are unchanged.
 
 ## Configuration
 
@@ -248,7 +272,8 @@ Six fixtures in `tests/fixtures/` cover ordinary prose, abbreviation heuristics,
 macro arguments, nested lists, tables, math, comments, explicit line breaks,
 verbatim/custom newline-sensitive environments, Unicode, footnotes, URLs,
 BibTeX citations, and multipass cross-references. Five fixtures run with both
-pdfLaTeX and LuaLaTeX; the `fontspec` Unicode fixture runs with LuaLaTeX.
+pdfLaTeX and LuaLaTeX; the `fontspec` Unicode fixture and the LaTeX README example
+run with LuaLaTeX.
 
 For each fixture/engine combination, the suite:
 
@@ -302,3 +327,4 @@ the hook so their source layout remains part of the test input.
 - `lib/TexLint/LatexIndentAdapter.pm`: isolated upstream sentence integration.
 - `libexec/tex-lint-worker.pl`: one fresh upstream process per input file.
 - `tests/`: dependency-free tests and gated real-backend fixtures.
+- `examples/README.tex`: maintained LaTeX user guide and formatting demonstration.
