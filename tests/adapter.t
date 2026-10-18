@@ -37,4 +37,15 @@ ok(!TexLint::LatexIndentAdapter::_inline_object({type => 'special', name => 'dis
 ok(TexLint::LatexIndentAdapter::_inline_object({type => 'special', name => 'inlineMath'}, '$x = y$'), 'inline math remains an atomic inline span');
 ok(!TexLint::LatexIndentAdapter::_inline_object({type => 'special', name => 'texLintMacro'}, '\\newline'), 'explicit newline command is a barrier');
 ok(!TexLint::LatexIndentAdapter::_inline_object({type => 'special', name => 'texLintMacro'}, "\\foo{line\nbreak}"), 'multiline macro is a barrier');
+my $legacy_settings = {
+    modifyLineBreaks => {oneSentencePerLine => {}, textWrapOptions => {}},
+    specialBeginEnd => {specialBeforeCommand => 1, inlineMath => {begin => '\\$', end => '\\$', lookForThis => 1}},
+};
+TexLint::LatexIndentAdapter::_configure($legacy_settings, {});
+is($legacy_settings->{specialBeginEnd}{inlineMath}{lookForThis}, 'verbatim', '3.x hash-shaped math settings are protected');
+is($legacy_settings->{specialBeginEnd}{specialBeforeCommand}, 1, '3.x scalar special setting is retained');
+ok(exists $legacy_settings->{specialBeginEnd}{texLintParenMath}, '3.x receives parenthesized math protection');
+my $legacy_object = {body => 'Short sentence.', follows => "}new\n    "};
+TexLint::LatexIndentAdapter::_wrap_object($legacy_object, TexLint::Config->new, 1);
+is($legacy_object->{body}, '    Short sentence.', '3.x callback returns the first-line prefix consumed by upstream');
 1;

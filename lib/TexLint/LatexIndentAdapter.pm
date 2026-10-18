@@ -17,13 +17,26 @@ sub _configure {
     @$wrap{qw(columns when huge)} = ($config->{hard_width}, 'after', 'overflow');
     $wrap->{comments}{wrap} = 0;
     # Use upstream's protection routines before sentence detection starts.
-    for my $special (@{$settings->{specialBeginEnd}}) {
+    my $specials = $settings->{specialBeginEnd};
+    my @specials = ref($specials) eq 'HASH'
+        ? map { +{name => $_, %{$specials->{$_}}} } grep { ref($specials->{$_}) eq 'HASH' } keys %$specials
+        : @$specials;
+    for my $special (@specials) {
         $special->{lookForThis} = 'verbatim'
             if ($special->{name} // '') =~ /\A(?:inlineMath|displayMath|displayMathTeX)\z/;
     }
-    push @{$settings->{specialBeginEnd}}, {
+    push @specials, {
         name => 'texLintParenMath', begin => '(?<!\\\\)\\\\\\(', end => '\\\\\\)', lookForThis => 'verbatim',
     };
+    if (ref($specials) eq 'HASH') {
+        for my $special (@specials) {
+            my %entry = %$special;
+            my $name = delete $entry{name};
+            $specials->{$name} = \%entry;
+        }
+    } else {
+        $settings->{specialBeginEnd} = \@specials;
+    }
     for my $env (qw(equation equation* align align* alignat alignat* gather gather* multline multline* displaymath math tabular tabular* tabularx longtable array tikzpicture)) {
         $settings->{verbatimEnvironments}{$env} = 1;
     }
@@ -54,13 +67,13 @@ sub _inline_object {
 }
 
 sub _wrap_object {
-    my ($self, $config) = @_;
-    my ($indent) = ($self->{follows} // '') =~ /(?:\A|\n)([ \t]*)\z/;
+    my ($self, $config, $legacy) = @_;
+    my ($indent) = (($self->{follows} // '') . ($self->{leadingHorizontalSpace} // '')) =~ /(?:\A|\n)([ \t]*)\z/;
     $self->{body} = wrap_sentence($self->{body}, $config,
         indent => $indent // '', protected => _protected_text());
-    # Upstream retains the surrounding indentation when replacing the sentence
-    # ID. Only continuation lines need a prefix in the object's own body.
-    substr($self->{body}, 0, length($indent), '') if defined($indent) && length($indent);
+    # 4.x retains surrounding indentation when replacing sentence IDs. The
+    # 3.x replacement routine consumes it, so that path needs the first prefix.
+    substr($self->{body}, 0, length($indent), '') if !$legacy && defined($indent) && length($indent);
 }
 
 # latexindent has no public sentence callback. Keep the process-local private
@@ -93,9 +106,11 @@ sub run {
         die "Unsupported latexindent interface: missing $method\n"
             unless LatexIndent::Document->can($method);
     }
-    die "Unsupported latexindent interface: sentence objects unavailable\n"
-        unless LatexIndent::Sentence->can('mlb_one_sentence_per_line_indent')
-            && LatexIndent::Verbatim->can('create_unique_id');
+    die "Unsupported latexindent interface: verbatim objects unavailable\n"
+        unless LatexIndent::Verbatim->can('create_unique_id');
+    my $legacy = !LatexIndent::Sentence->can('mlb_one_sentence_per_line_indent');
+    my $settings = $legacy ? \%LatexIndent::GetYamlSettings::mainSettings
+        : \%LatexIndent::GetYamlSettings::mainSetting;
 
     my $read_settings = LatexIndent::Document->can('yaml_read_settings');
     my $sentences = LatexIndent::Document->can('one_sentence_per_line');
@@ -105,7 +120,6 @@ sub run {
     local *{'LatexIndent::Document::yaml_read_settings'} = sub {
         my ($self) = @_;
         $read_settings->(@_);
-        my $settings = \%LatexIndent::GetYamlSettings::mainSetting;
         $config = _configure($settings, $options{overrides});
     };
     local *{'LatexIndent::Document::one_sentence_per_line'} = sub {
@@ -120,10 +134,12 @@ sub run {
             $storage->{$object->{id}} = $object;
             return $object->{id};
         });
-        my $settings = \%LatexIndent::GetYamlSettings::mainSetting;
         my $sentence = $settings->{modifyLineBreaks}{oneSentencePerLine};
         my $tokens = \%LatexIndent::Tokens::tokens;
         my @barriers = map { quotemeta($_) } @$tokens{qw(blanklines doubleBackSlash)};
+        # dodge_double_backslash protects only \\ followed by a brace/bracket,
+        # not ordinary hard line breaks. Keep those as barriers too.
+        push @barriers, qr/\\\\/;
         push @barriers, '\\\\par(?![a-zA-Z])';
         push @barriers, $LatexIndent::TrailingComments::trailingCommentRegExp;
         my @inline;
@@ -148,6 +164,13 @@ sub run {
     local *{'LatexIndent::Sentence::text_wrap'} = sub {
         my ($self) = @_;
         _wrap_object($self, $config);
+    };
+    my $text_wrap = LatexIndent::Document->can('text_wrap');
+    local *{'LatexIndent::Document::text_wrap'} = sub {
+        my ($self) = @_;
+        return _wrap_object($self, $config, 1)
+            if $legacy && ($self->{modifyLineBreaksYamlName} // '') eq 'sentence';
+        return $text_wrap->(@_);
     };
     local @ARGV = ('-m', '-s', "-c=$options{scratch}", "-o=$options{output}");
     push @ARGV, $options{input};

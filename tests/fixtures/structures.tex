@@ -1,0 +1,37 @@
+\documentclass{article}
+\usepackage{amsmath}
+\newenvironment{linewise}{\par\begingroup\obeylines}{\endgroup\par}
+\begin{document}
+\section{Nested lists and protected structures}
+\begin{enumerate}
+\item A first item has two sentences. Its second sentence is long enough to wrap, with a preferred punctuation boundary and additional prose.
+\begin{itemize}
+\item A nested item has a short sentence. Another sentence contains more ordinary words, which should retain the same list layout after source formatting.
+\item[Custom label] This item uses a custom label, followed by enough prose to check the surrounding indentation.
+\end{itemize}
+\item The final outer item refers to the table below, with a little more prose for wrapping.
+\end{enumerate}
+
+\begin{description}
+\item[Description] A description entry contains text, with an additional sentence. The second sentence is deliberately longer than the soft width.
+\end{description}
+
+\begin{tabular}{ll}
+  First column & Second column \\
+  A, B; C: D   & Keep the table source intact. \\
+\end{tabular}
+
+\begin{align*}
+  a, b &= c + d \\
+  e &= f + g
+\end{align*}
+
+\begin{linewise}
+This newline-sensitive environment must keep its source lines.
+Another line, with punctuation; stays on this line.
+\end{linewise}
+
+%\begin{noindent}
+This protected block has two sentences. Its original source wrapping stays intact.
+%\end{noindent}
+\end{document}

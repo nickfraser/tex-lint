@@ -1,0 +1,28 @@
+\documentclass{article}
+\usepackage{hyperref}
+\newcommand{\wrapped}[2][default]{\textbf{#1: #2}}
+\begin{document}
+Text before% This comment suppresses the source newline.
+joined text. Another sentence contains ordinary words, with enough prose to exercise wrapping around the comment barrier.
+
+A sentence ends here. % Keep this trailing comment attached.
+The following sentence begins here, with enough additional prose to wrap more than once while preserving the original typesetting.
+
+An escaped \% percent sign is ordinary text, and \{escaped braces\} must stay intact together with a TeX control\ space and nonbreaking~spaces.
+
+An explicit line break\\
+continues here. A starred line break\\*[3pt]
+also continues here. A newline command\newline
+continues on another line.
+
+A macro \wrapped[an {optional} argument]{nested {braces}, escaped \{braces\}, and punctuation. Another phrase} stays atomic, with more prose following it.
+
+A macro containing a comment \wrapped{before% Preserve the suppressed newline inside this argument.
+after} must keep that argument exactly as written.
+
+An inline verbatim command \verb|a  b, c; d: e. % raw| preserves significant spaces, including its punctuation and percent sign.
+
+A display-math block follows this sentence.
+\[ x, y = z + 1.25 \]
+Another paragraph follows the display, with a short sentence. A final sentence has more ordinary words for wrapping.
+\end{document}

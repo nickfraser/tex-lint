@@ -1,0 +1,18 @@
+\documentclass{article}
+\usepackage{amsmath}
+\usepackage{hyperref}
+\begin{document}
+\section{A referenced section}\label{sec:introduction}
+This paragraph cites a book~\cite{knuth1984}, then refers to Section~\ref{sec:details}, Equation~\ref{eq:sample}, and page~\pageref{sec:details} using references that latexmk must resolve across multiple passes.
+
+\begin{equation}\label{eq:sample}
+  E = mc^2
+\end{equation}
+
+\newpage
+\section{Details}\label{sec:details}
+The details refer back to Section~\ref{sec:introduction}, with a second citation~\cite{lamport1994} and enough prose to exercise sentence wrapping around protected reference macros.
+
+\bibliographystyle{plain}
+\bibliography{references}
+\end{document}

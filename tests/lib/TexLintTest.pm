@@ -5,8 +5,9 @@ use Exporter 'import';
 use Cwd qw(abs_path);
 use File::Path qw(make_path);
 use File::Temp qw(tempdir);
+use File::Spec;
 use Encode qw(encode decode);
-our @EXPORT = qw(ok is like throws skip scratch write_text read_text run_cli finish);
+our @EXPORT = qw(ok is like throws skip scratch write_text read_text read_bytes run_cli run_command find_program finish);
 our ($count, $failed) = (0, 0);
 our $root;
 
@@ -45,11 +46,25 @@ sub write_text {
 }
 sub read_text {
     my ($path) = @_;
+    return decode('UTF-8', read_bytes($path));
+}
+sub read_bytes {
+    my ($path) = @_;
     open my $fh, '<:raw', $path or die "$path: $!";
     local $/;
-    return decode('UTF-8', <$fh> // '');
+    return <$fh> // '';
 }
 sub run_cli {
+    my ($cwd, $stdin, @args) = @_;
+    return run_command($cwd, $stdin, $^X, "$root/bin/tex-lint", @args);
+}
+sub find_program {
+    my ($name) = @_;
+    my @paths = $name =~ m{/} ? ($name) : map { File::Spec->catfile($_, $name) } File::Spec->path;
+    for my $path (@paths) { return abs_path($path) if -f $path && -x $path; }
+    die "Required integration-test tool is unavailable: $name\n";
+}
+sub run_command {
     my ($cwd, $stdin, @args) = @_;
     my $dir = scratch();
     write_text("$dir/stdin", $stdin // '');
@@ -61,7 +76,7 @@ sub run_cli {
         open STDOUT, '>:raw', "$dir/stdout" or die $!;
         open STDERR, '>:raw', "$dir/stderr" or die $!;
         @args = map { utf8::is_utf8($_) ? encode('UTF-8', $_) : $_ } @args;
-        exec {$^X} $^X, "$root/bin/tex-lint", @args;
+        exec {$args[0]} @args;
         die "exec: $!";
     }
     waitpid($pid, 0);

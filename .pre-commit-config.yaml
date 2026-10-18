@@ -6,3 +6,4 @@ repos:
         entry: bin/tex-lint
         language: system
         files: '\.tex$'
+        exclude: ^tests/fixtures/

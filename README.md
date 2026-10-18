@@ -21,17 +21,19 @@ There is no project package-install or build step, and no Python environment is
 needed. With the runtime requirements available, run `bin/tex-lint` directly,
 or use `perl bin/tex-lint`.
 
-**Validation status:** the independent wrapping, macro protection, adapter
-callbacks, configuration validation, and CLI error tests run without TeX Live.
-The full-document integration tests are implemented but have not yet been run
-against a real `latexindent` installation. Compilation checks also remain to be
-done once TeX Live is ready.
+**Verified integration:** `latexindent` **3.24.7**, `latexmk` **4.87**, TeX Live
+**2025** (pdfLaTeX and LuaLaTeX), and Poppler **25.07.0**. The full suite passes
+**310 assertions**, including 11 original/formatted fixture pairs with identical
+extracted text, page geometry, and page rasters at 96 dpi. Tests also verify
+source idempotence and resolved bibliography/cross-references.
 
 The adapter uses process-local overrides of latexindent's internal sentence
-methods, based on its 3.5.1-and-later sentence-object architecture and upstream
-4.0.3 source. It checks for the methods it needs. It does not modify the installed
-tool. A standalone compiled `latexindent` binary without its Perl modules is not
-a supported backend.
+methods. The tested 3.x path handles the older settings hash and document-level
+sentence-wrapping callback. A separate 4.x path follows upstream 4.0.3's internal
+interface; it has callback unit tests but has not been verified against a real
+4.x installation. The adapter checks the methods it needs and does not modify
+the installed tool. A standalone compiled `latexindent` binary without its Perl
+modules is not a supported backend.
 
 ## Locate TeX Live
 
@@ -212,7 +214,13 @@ configuration validation, protected spans, indentation callbacks, idempotence,
 and CLI errors. Without a real backend, the full-document integration group is
 explicitly skipped.
 
-Enable the real-backend suite after TeX Live is ready:
+Run the real-backend suite using `latexindent` from `PATH`:
+
+```bash
+perl tests/run.pl --integration
+```
+
+To select a particular backend instead:
 
 ```bash
 TEX_LINT_LATEXINDENT=/absolute/path/to/latexindent.pl perl tests/run.pl
@@ -222,14 +230,46 @@ That group exercises actual sentence detection, YAML/CLI precedence, file/check/
 stdin/output modes, recursive input discovery, protected TeX fixtures, and
 whole-document idempotence. A backend or dependency failure fails the tests.
 
-The compilation fixture is `tests/fixtures/protected.tex`. Compile the original
-and a separately formatted copy after the integration tests pass, and compare
-their typeset output before adopting the formatter across a document collection.
-Compilation is not part of the dependency-free test run.
+### Compilation and PDF equivalence
+
+Run the complete suite, including real-backend integration and compilation:
+
+```bash
+perl tests/run.pl --compile
+```
+
+This requires `latexindent`, `latexmk`, `pdflatex`, `lualatex`, `bibtex`,
+`pdftotext`, `pdfinfo`, and `pdftoppm` on `PATH`. On Fedora, the PDF utilities
+come from `poppler-utils`. Explicit integration/compilation requests fail if a
+required tool is unavailable; the default unit-test command skips those groups.
+`TEX_LINT_LATEXINDENT` still overrides backend selection with `--compile`.
+
+Six fixtures in `tests/fixtures/` cover ordinary prose, abbreviation heuristics,
+macro arguments, nested lists, tables, math, comments, explicit line breaks,
+verbatim/custom newline-sensitive environments, Unicode, footnotes, URLs,
+BibTeX citations, and multipass cross-references. Five fixtures run with both
+pdfLaTeX and LuaLaTeX; the `fontspec` Unicode fixture runs with LuaLaTeX.
+
+For each fixture/engine combination, the suite:
+
+1. Confirms that formatting actually changes source and is idempotent.
+2. Builds original and formatted documents using `latexmk -norc`, allowing
+   bibliography and reference passes to converge.
+3. Checks the final logs for unresolved references and missing glyphs.
+4. Compares exact `pdftotext -layout` output and page count/geometry.
+5. Compares every rendered page byte-for-byte at 96 dpi using `pdftoppm`.
+
+Separate negative controls deliberately change content and shift text placement
+to verify that the comparisons catch both kinds of difference. PDF files
+themselves are not compared byte-for-byte because metadata and source-dependent
+objects can differ without changing typesetting.
 
 Runtime scratch input copies, output copies, and upstream logs are confined to
 `$PWD/.ocs/tex-lint/run-*` and removed after each invocation. Tests use disposable
-directories under `.ocs/tests/`. No persistent test reports or caches are needed.
+directories under `.ocs/tests/`. Compilation runs retain source copies, PDFs,
+extracted text, page rasters, build logs, and local TeX/font caches under
+`.ocs/integration/compile-*`; the test output prints the exact directory. These
+artifacts are ignored by Git and can be inspected after a failure or success.
 
 ## Pre-commit
 
@@ -244,11 +284,14 @@ repos:
         entry: bin/tex-lint
         language: system
         files: '\.tex$'
+        exclude: ^tests/fixtures/
 ```
 
 It uses the checkout and the current `PATH`/`LATEXINDENT`, formatting matching
 files in place. When using the hook in another repository, set `entry` to this
 checkout's absolute `bin/tex-lint` path.
+This checkout excludes its deliberately unformatted regression fixtures from
+the hook so their source layout remains part of the test input.
 
 ## Source layout
 

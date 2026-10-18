@@ -1,0 +1,21 @@
+\documentclass{article}
+\usepackage[T1]{fontenc}
+\usepackage{hyperref}
+\begin{document}
+\section{Semantic source wrapping}
+This short sentence stays together. A longer sentence contains a comma, then a semicolon; then a colon: and enough additional prose to exercise the preferred boundaries repeatedly without changing the printed paragraph.
+
+An example uses e.g. an abbreviation, i.e. ordinary punctuation within prose, together with the decimal 3.14159 and the name \LaTeX{} in a sentence. Is the next sentence a question? Yes, it is!
+
+This sentence uses a standalone -- dash, followed by a standalone --- longer dash, and some well-known hyphenated words that should remain intact.
+
+\begin{abstract}
+Short sentence. A longer sentence inside an indented environment has punctuation, together with enough words to check continuation widths and indentation.
+\end{abstract}
+
+A footnote\footnote{This is a footnote. Its macro argument is deliberately atomic, including the punctuation.} belongs to this sentence, which continues after its marker with more ordinary text.
+
+A long URL stays indivisible: \url{https://example.org/a/very/long/path/with/commas,and;semicolons?value=one:two} is followed by a final sentence.
+
+This final paragraph deliberately has no sentence-ending punctuation
+\end{document}
