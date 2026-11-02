@@ -27,7 +27,7 @@ sub is {
         print "# got: $got\n# expected: $expected\n";
     }
 }
-sub like { my ($got, $pattern, $name) = @_; ok($got =~ $pattern, $name); }
+sub like { my ($got, $pattern, $name) = @_; ok(scalar($got =~ $pattern), $name); }
 sub throws {
     my ($code, $pattern, $name) = @_;
     my $success = eval { $code->(); 1 };
