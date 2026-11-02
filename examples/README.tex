@@ -51,17 +51,14 @@ rather than typeset text.
 \section{Requirements and current status}
 
 \begin{itemize}
-    \item
-          Perl 5.32 or newer,
-          including its standard modules and Unicode character data.
-    \item
-          The \textbf{Perl-script distribution} of \code{latexindent},
-          with its \code{LatexIndent/} modules and \code{defaultSettings.yaml}.
-          TeX Live's script distribution is suitable.
-    \item
-          The Perl dependencies of \code{latexindent},
-          including \code{YAML::Tiny} and \code{File::HomeDir},
-          available to the Perl interpreter running \code{tex-lint}.
+\item Perl 5.32 or newer,
+including its standard modules and Unicode character data.
+\item The \textbf{Perl-script distribution} of \code{latexindent},
+with its \code{LatexIndent/} modules and \code{defaultSettings.yaml}.
+TeX Live's script distribution is suitable.
+\item The Perl dependencies of \code{latexindent},
+including \code{YAML::Tiny} and \code{File::HomeDir},
+available to the Perl interpreter running \code{tex-lint}.
 \end{itemize}
 
 There is no project package-install or build step,
@@ -72,8 +69,8 @@ or use \code{perl bin/tex-lint}.
 \textbf{Verified integration:} \code{latexindent} \textbf{3.24.7},
 \code{latexmk} \textbf{4.87}, TeX Live \textbf{2025} (pdfLaTeX and LuaLaTeX),
 and Poppler \textbf{25.07.0}.
-The full suite passes \textbf{319 assertions},
-including 12 original/formatted document pairs with identical extracted text,
+The full suite passes \textbf{376 assertions},
+including 14 original/formatted document pairs with identical extracted text,
 page geometry, and page rasters at 96 dpi.
 Tests also verify source idempotence and resolved bibliography/cross-references.
 
@@ -238,21 +235,70 @@ With no project setting,
 surrounding indentation follows the defaults of \code{latexindent},
 including tab indentation.
 
+\subsection{List source layout}
+
+This project's configuration keeps the first sentence on the same line as \verb|\item|, and makes ordinary and nested lists flush-left without a hanging indent:
+
+\begin{verbatim}
+\begin{itemize}
+\item First sentence.
+Another sentence in the same item.
+\item A longer sentence, with a preferred break,
+and a continuation without extra indentation.
+\end{itemize}
+\end{verbatim}
+
+Select that style through native latexindent settings:
+
+\begin{verbatim}
+noAdditionalIndent:
+  item: 1
+  itemize: 1
+  enumerate: 1
+  description: 1
+
+noAdditionalIndentGlobal:
+  items: 1
+
+modifyLineBreaks:
+  items:
+    ItemFinishesWithLineBreak: -1
+\end{verbatim}
+
+The explicit \code{noAdditionalIndent.item: 1} is important:
+upstream's per-name six-space item indent takes precedence over
+\code{noAdditionalIndentGlobal.items}.
+The environment entries remove the additional indentation inside those lists;
+omit those entries to retain surrounding list indentation with inline items.
+Any indentation inherited from a containing non-list environment still applies.
+The setting \code{continuation_indent} remains available if extra continuation
+spaces are desired.
+
+The adapter honors \code{ItemFinishesWithLineBreak: -1} for standard \verb|\item| commands,
+including balanced optional labels such as \verb|\item[Label]|.
+The item command and label count toward the first line's width only;
+the first word stays attached to the marker.
+Later sentences still start on new source lines.
+Comments, blank paragraphs,
+and protected block content remain barriers rather than being joined onto an
+item line.
+A long indivisible marker/label plus its first word may overflow.
+
+Without the \code{-1} setting, existing separate-item behavior is retained.
+
+Set \code{ItemFinishesWithLineBreak: 1} to explicitly request a newline after
+\verb|\item|.
+
 \subsection{Wrapping policy}
 
 While the remaining sentence exceeds the available soft width, choose:
 
 \begin{enumerate}
-    \item
-          The rightmost preferred punctuation boundary at or before soft.
-    \item
-          Otherwise,
-          the first preferred boundary after soft but at or before hard.
-    \item
-          Otherwise, the rightmost safe whitespace boundary at or before soft.
-    \item
-          If the first indivisible word or protected span exceeds soft,
-          the first safe whitespace after that span.
+\item The rightmost preferred punctuation boundary at or before soft.
+\item Otherwise, the first preferred boundary after soft but at or before hard.
+\item Otherwise, the rightmost safe whitespace boundary at or before soft.
+\item If the first indivisible word or protected span exceeds soft,
+the first safe whitespace after that span.
 \end{enumerate}
 
 For example, with soft \code{20} and hard \code{26}:
@@ -291,40 +337,30 @@ and protected macros may overflow the hard width rather than being split.
 \subsection{LaTeX-specific behavior}
 
 \begin{itemize}
-    \item
-          Sentence recognition, including its abbreviation heuristics,
-          comes from \code{latexindent}.
-          Customize its \code{oneSentencePerLine} detection settings for the
-          project.
-          Markdown's \code{--slw-*} language options have no direct LaTeX
-          equivalent.
-          Prose upstream does not recognize as a sentence,
-          such as text without a sentence-ending marker,
-          receives normal indentation rather than reflow.
-    \item
-          Existing eligible prose line breaks are rejoined before wrapping.
-    \item
-          Verbatim environments and commands use upstream's protection routines.
-    \item
-          Inline math (\verb|$...$|, \verb|\(...\)|), display math,
-          common equation environments, common table environments,
-          and \code{tikzpicture} are protected from reflow.
-    \item
-          Macro invocations with balanced optional/mandatory arguments stay atomic,
-          including URLs and citations.
-          Their original source width is measured.
-          Sentences inside a macro argument are not split independently.
-    \item
-          Comments, paragraph boundaries, explicit \verb|\\| breaks,
-          and multiline protected objects are barriers.
-          Sentences crossing a barrier are conservatively left out of reflow.
-          Comment text is not wrapped or moved by the sentence pass.
-    \item
-          Document structure, item indentation,
-          and other normal indentation remain the responsibility of
-          \code{latexindent}.
-          Custom verbatim environments and \verb|%\begin{noindent}| blocks can
-          be specified through its usual YAML settings.
+\item Sentence recognition, including its abbreviation heuristics,
+comes from \code{latexindent}.
+Customize its \code{oneSentencePerLine} detection settings for the project.
+Markdown's \code{--slw-*} language options have no direct LaTeX equivalent.
+Prose upstream does not recognize as a sentence,
+such as text without a sentence-ending marker,
+receives normal indentation rather than reflow.
+\item Existing eligible prose line breaks are rejoined before wrapping.
+\item Verbatim environments and commands use upstream's protection routines.
+\item Inline math (\verb|$...$|, \verb|\(...\)|), display math,
+common equation environments, common table environments,
+and \code{tikzpicture} are protected from reflow.
+\item Macro invocations with balanced optional/mandatory arguments stay atomic,
+including URLs and citations.
+Their original source width is measured.
+Sentences inside a macro argument are not split independently.
+\item Comments, paragraph boundaries, explicit \verb|\\| breaks,
+and multiline protected objects are barriers.
+Sentences crossing a barrier are conservatively left out of reflow.
+Comment text is not wrapped or moved by the sentence pass.
+\item Document structure, item indentation,
+and other normal indentation remain the responsibility of \code{latexindent}.
+Custom verbatim environments and \verb|%\begin{noindent}| blocks can be
+specified through its usual YAML settings.
 \end{itemize}
 
 The adapter enforces sentence manipulation, wrapping after indentation,
@@ -383,30 +419,25 @@ the default unit-test command skips those groups.
 The variable \code{TEX_LINT_LATEXINDENT} still overrides backend selection with
 \code{--compile}.
 
-Six fixtures in \code{tests/fixtures/} cover ordinary prose,
+Seven fixtures in \code{tests/fixtures/} cover ordinary prose,
 abbreviation heuristics, macro arguments, nested lists, tables, math, comments,
 explicit line breaks, verbatim/custom newline-sensitive environments, Unicode,
-footnotes, URLs, BibTeX citations, and multipass cross-references.
-Five fixtures run with both pdfLaTeX and LuaLaTeX;
+footnotes, URLs, BibTeX citations, multipass cross-references,
+and inline/flush-left items.
+Six fixtures run with both pdfLaTeX and LuaLaTeX;
 the \code{fontspec} Unicode fixture and this LaTeX README example run with
 LuaLaTeX.
 
 For each document/engine combination, the suite:
 
 \begin{enumerate}
-    \item
-          Confirms that formatting actually changes source and is idempotent.
-    \item
-          Builds original and formatted documents using \code{latexmk -norc},
-          allowing bibliography and reference passes to converge.
-    \item
-          Checks the final logs for unresolved references and missing glyphs.
-    \item
-          Compares exact \code{pdftotext -layout} output and page
-          count/geometry.
-    \item
-          Compares every rendered page byte-for-byte at 96 dpi using
-          \code{pdftoppm}.
+\item Confirms that formatting actually changes source and is idempotent.
+\item Builds original and formatted documents using \code{latexmk -norc},
+allowing bibliography and reference passes to converge.
+\item Checks the final logs for unresolved references and missing glyphs.
+\item Compares exact \code{pdftotext -layout} output and page count/geometry.
+\item Compares every rendered page byte-for-byte at 96 dpi using
+\code{pdftoppm}.
 \end{enumerate}
 
 Separate negative controls deliberately change content and shift text placement
@@ -450,22 +481,19 @@ hook so their source layout remains part of the test input.
 \section{Source layout}
 
 \begin{description}
-    \item[\code{bin/tex-lint}]
-          Input discovery, CLI, and the check/write/output workflow.
-    \item[\code{lib/TexLint/Config.pm}]
-          Shared setting validation.
-    \item[\code{lib/TexLint/SentenceWrap.pm}]
-          Independent display-column wrapping core.
-    \item[\code{lib/TexLint/Protection.pm}]
-          Balanced macro-argument protection.
-    \item[\code{lib/TexLint/LatexIndentAdapter.pm}]
-          Isolated upstream sentence integration.
-    \item[\code{libexec/tex-lint-worker.pl}]
-          One fresh upstream process per input file.
-    \item[\code{tests/}]
-          Dependency-free tests and gated real-backend fixtures.
-    \item[\code{examples/README.tex}]
-          This maintained LaTeX user guide and formatting demonstration.
+\item[\code{bin/tex-lint}] Input discovery, CLI,
+and the check/write/output workflow.
+\item[\code{lib/TexLint/Config.pm}] Shared setting validation.
+\item[\code{lib/TexLint/SentenceWrap.pm}] Independent display-column wrapping
+core.
+\item[\code{lib/TexLint/Protection.pm}] Balanced macro-argument protection.
+\item[\code{lib/TexLint/LatexIndentAdapter.pm}] Isolated upstream sentence
+integration.
+\item[\code{libexec/tex-lint-worker.pl}] One fresh upstream process per input
+file.
+\item[\code{tests/}] Dependency-free tests and gated real-backend fixtures.
+\item[\code{examples/README.tex}] This maintained LaTeX user guide and
+formatting demonstration.
 \end{description}
 
 \end{document}

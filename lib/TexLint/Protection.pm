@@ -2,7 +2,7 @@ package TexLint::Protection;
 use strict;
 use warnings;
 use Exporter 'import';
-our @EXPORT_OK = qw(protect_commands);
+our @EXPORT_OK = qw(protect_commands protect_item_prefixes);
 
 # This scanner runs AFTER latexindent has hidden comments, verbatim, math,
 # and the preamble. It supplements that parser with balanced macro arguments;
@@ -48,6 +48,55 @@ sub protect_commands {
         }
         my $value = substr($text, $i, $end - $i);
         $output .= $valid ? $store->($value) : $value;
+        $i = $end;
+    }
+    return $output;
+}
+
+# Run only on upstream's already-protected body. Include the separating space
+# INSIDE the opaque prefix so wrapping can never strand \item on its own line.
+# The first prose word and its sentence punctuation remain visible to upstream.
+sub protect_item_prefixes {
+    my ($text, $store, %options) = @_;
+    my $output = '';
+    for (my $i = 0; $i < length($text);) {
+        pos($text) = $i;
+        if ($text !~ /\G(\\(?:[a-zA-Z@]+\*?|[^\r\n]))/gc) {
+            $output .= substr($text, $i++, 1);
+            next;
+        }
+        my $command = $1;
+        my $end = $i + length($command);
+        if ($command ne '\\item') {
+            $output .= $command;
+            $i = $end;
+            next;
+        }
+        my $label = '';
+        pos($text) = $end;
+        if ($text =~ /\G[ \t]*(?:\r?\n[ \t]*)?(?=\[)/gc) {
+            my $start = pos($text);
+            my $group_end = _group_end($text, $start);
+            if (!defined $group_end) {
+                $output .= $command;
+                $i = $end;
+                next;
+            }
+            $label = substr($text, $start, $group_end - $start);
+            $end = $group_end;
+        }
+        pos($text) = $end;
+        $text =~ /\G[ \t]*(?:\r?\n[ \t]*)?/gc;
+        $end = pos($text);
+        my $tail = substr($text, $end);
+        my $barrier = $options{barrier};
+        my $unsafe = !$tail || $tail =~ /\A\R|\A\\(?:begin|end|item|par)(?![a-zA-Z])/ || $label =~ /\R/;
+        $unsafe ||= $tail =~ /\A(?:$barrier)/ || $label =~ /$barrier/ if defined $barrier;
+        if ($unsafe) {
+            $output .= substr($text, $i, $end - $i);
+        } else {
+            $output .= $store->($command . $label . ' ');
+        }
         $i = $end;
     }
     return $output;

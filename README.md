@@ -23,7 +23,7 @@ or use `perl bin/tex-lint`.
 
 **Verified integration:** `latexindent` **3.24.7**, `latexmk` **4.87**, TeX Live
 **2025** (pdfLaTeX and LuaLaTeX), and Poppler **25.07.0**. The full suite passes
-**319 assertions**, including 12 original/formatted document pairs with identical
+**376 assertions**, including 14 original/formatted document pairs with identical
 extracted text, page geometry, and page rasters at 96 dpi. Tests also verify
 source idempotence and resolved bibliography/cross-references.
 
@@ -102,7 +102,8 @@ formatted text. `--check` and `--output` cannot be combined.
 [`examples/README.tex`](examples/README.tex) is a maintained LaTeX edition of this
 guide and a substantial formatting demonstration. Its source uses the project's
 default 80/100 widths, with protected code examples, hyperlinks, lists, and a
-table. Run these commands from the repository root to check it and build a PDF
+table. Lists use the project's flush-left, inline-item settings described below.
+Run these commands from the repository root to check it and build a PDF
 with LuaLaTeX:
 
 ```bash
@@ -159,6 +160,55 @@ Widths must be positive integers and `soft_width` must not exceed `hard_width`.
 `--semantic-wrap-continuation-indent`. It is additional to the surrounding
 LaTeX indentation. With no project setting, surrounding indentation follows
 latexindent's defaults, including tab indentation.
+
+### List source layout
+
+This project's configuration keeps the first sentence on the same line as
+`\item`, and makes ordinary and nested lists flush-left without a hanging indent:
+
+```latex
+\begin{itemize}
+\item First sentence.
+Another sentence in the same item.
+\item A longer sentence, with a preferred break,
+and a continuation without extra indentation.
+\end{itemize}
+```
+
+Select that style through native latexindent settings:
+
+```yaml
+noAdditionalIndent:
+  item: 1
+  itemize: 1
+  enumerate: 1
+  description: 1
+
+noAdditionalIndentGlobal:
+  items: 1
+
+modifyLineBreaks:
+  items:
+    ItemFinishesWithLineBreak: -1
+```
+
+The explicit `noAdditionalIndent.item: 1` is important: upstream's per-name
+six-space item indent takes precedence over `noAdditionalIndentGlobal.items`.
+The environment entries remove the additional indentation inside those lists;
+omit those entries to retain surrounding list indentation with inline items.
+Any indentation inherited from a containing non-list environment still applies.
+`continuation_indent` remains available if extra continuation spaces are desired.
+
+The adapter honors `ItemFinishesWithLineBreak: -1` for standard `\item` commands,
+including balanced optional labels such as `\item[Label]`. The item command and
+label count toward the first line's width only; the first word stays attached to
+the marker. Later sentences still start on new source lines. Comments, blank
+paragraphs, and protected block content remain barriers rather than being joined
+onto an item line. A long indivisible marker/label plus its first word may overflow.
+
+Without the `-1` setting, existing separate-item behavior is retained.
+
+Set `ItemFinishesWithLineBreak: 1` to explicitly request a newline after `\item`.
 
 ### Wrapping policy
 
@@ -268,11 +318,12 @@ come from `poppler-utils`. Explicit integration/compilation requests fail if a
 required tool is unavailable; the default unit-test command skips those groups.
 `TEX_LINT_LATEXINDENT` still overrides backend selection with `--compile`.
 
-Six fixtures in `tests/fixtures/` cover ordinary prose, abbreviation heuristics,
+Seven fixtures in `tests/fixtures/` cover ordinary prose, abbreviation heuristics,
 macro arguments, nested lists, tables, math, comments, explicit line breaks,
 verbatim/custom newline-sensitive environments, Unicode, footnotes, URLs,
-BibTeX citations, and multipass cross-references. Five fixtures run with both
-pdfLaTeX and LuaLaTeX; the `fontspec` Unicode fixture and the LaTeX README example
+BibTeX citations, multipass cross-references, and inline/flush-left items.
+Six fixtures run with both pdfLaTeX and LuaLaTeX;
+the `fontspec` Unicode fixture and the LaTeX README example
 run with LuaLaTeX.
 
 For each fixture/engine combination, the suite:

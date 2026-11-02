@@ -20,21 +20,25 @@ if (!$ENV{TEX_LINT_COMPILE}) {
     my $backend = $ENV{TEX_LINT_LATEXINDENT} // find_program('latexindent');
     my $settings = "$artifacts/settings.yaml";
     write_text($settings, "semantic_wrap:\n  soft_width: 40\n  hard_width: 55\ndefaultIndent: '    '\nverbatimEnvironments:\n  linewise: 1\n");
+    my $inline_settings = "$artifacts/inline-items.yaml";
+    write_text($inline_settings, read_text($settings)
+        . "noAdditionalIndent:\n  item: 1\n  itemize: 1\n  enumerate: 1\n  description: 1\nnoAdditionalIndentGlobal:\n  items: 1\nmodifyLineBreaks:\n  items:\n    ItemFinishesWithLineBreak: -1\n");
     my %results;
     for my $engine (qw(pdflatex lualatex)) {
-        for my $fixture (qw(protected prose structures references whitespace unicode readme)) {
+        for my $fixture (qw(protected prose structures references whitespace unicode items readme)) {
             next if ($fixture eq 'unicode' || $fixture eq 'readme') && $engine eq 'pdflatex';
             my $case = "$artifacts/$engine-$fixture";
             make_path("$case/original", "$case/formatted");
             my $source_path = $fixture eq 'readme' ? "$TexLintTest::root/examples/README.tex"
                 : "$TexLintTest::root/tests/fixtures/$fixture.tex";
             my $source = read_text($source_path);
+            my $case_settings = $fixture eq 'items' || $fixture eq 'readme' ? $inline_settings : $settings;
             my ($status, $formatted, $err) = run_cli($case, $source,
-                '--latexindent', $backend, '--config', $settings, '-');
+                '--latexindent', $backend, '--config', $case_settings, '-');
             die "Cannot format $fixture for compilation:\n$err" if $status;
             ok($formatted ne $source, "$engine/$fixture actually changes source wrapping");
             my ($again_status, $again, $again_err) = run_cli($case, $formatted,
-                '--latexindent', $backend, '--config', $settings, '-');
+                '--latexindent', $backend, '--config', $case_settings, '-');
             die "Cannot reformat $fixture:\n$again_err" if $again_status;
             is($again, $formatted, "$engine/$fixture is source-idempotent");
             for my $variant (qw(original formatted)) {

@@ -1,0 +1,24 @@
+\documentclass{article}
+\usepackage{amsmath}
+\usepackage{hyperref}
+\begin{document}
+\begin{itemize}
+  \item A first sentence. Another sentence in this item contains punctuation, with enough ordinary words to require repeated wrapping at a soft target.
+  \item
+  This item starts on a separate source line, but formatting should attach its first sentence to the item command without altering the typeset list.
+  \begin{enumerate}
+    \item An inner sentence has inline math $a, b = c$, a \textbf{protected phrase, with punctuation}, and additional text.
+    \item Another nested sentence. A following sentence stays on its own source line.
+  \end{enumerate}
+  \item % Preserve this comment and its newline.
+  Text following an item comment remains separate, with another sentence. This sentence also wraps normally.
+  \item A URL \url{https://example.org/a/long/path?value=one,two} stays indivisible, followed by additional prose.
+\end{itemize}
+
+\begin{description}
+  \item[Label] Labelled text counts the label toward its first source line, but does not add a hanging source indent to continuation lines. Another sentence follows.
+  \item[{Label with ] inside}] A balanced label with an embedded closing bracket remains unchanged, together with some longer prose that wraps.
+  \item[Commented] % Preserve the labelled comment as well.
+  This sentence starts after the comment. A second sentence follows.
+\end{description}
+\end{document}

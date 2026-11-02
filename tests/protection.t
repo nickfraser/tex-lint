@@ -1,7 +1,7 @@
 use strict;
 use warnings;
 use TexLintTest;
-use TexLint::Protection qw(protect_commands);
+use TexLint::Protection qw(protect_commands protect_item_prefixes);
 use TexLint::SentenceWrap qw(restore wrap_sentence);
 use TexLint::Config;
 my @cases = (
@@ -28,4 +28,20 @@ my %stored;
 my $hidden = protect_commands('One \\url{long url, with spaces} and more words.', sub { $stored{TOKEN} = $_[0]; return 'TOKEN'; });
 my $wrapped = wrap_sentence($hidden, TexLint::Config->new(soft_width => 12, hard_width => 18), protected => \%stored);
 like(restore($wrapped, \%stored), qr/\\url\{long url, with spaces\}/, 'macro internal spaces and punctuation never wrap');
+my %prefixes;
+my $n = 0;
+my $items = protect_item_prefixes("\\item\nFirst sentence.\n\\item[{Label with ] inside}] Next sentence.", sub {
+    my $id = 'ITEM' . ++$n;
+    $prefixes{$id} = $_[0];
+    return $id;
+});
+is($n, 2, 'item prefixes with balanced labels are protected');
+is(restore($items, \%prefixes), "\\item First sentence.\n\\item[{Label with ] inside}] Next sentence.", 'item whitespace normalized without hiding sentence punctuation');
+my $prefix_config = TexLint::Config->new(soft_width => 20, hard_width => 26);
+is(restore(wrap_sentence('ITEM1One two three four five six.', $prefix_config, protected => \%prefixes), \%prefixes),
+    "\\item One two three\nfour five six.", 'opaque prefix width counts on first line without stranding the marker');
+for my $input ('\\itemize Not an item.', '\\\\item Not an item.', '\\item[unclosed label', "\\item\n\nNew paragraph.", "\\item %comment\nFirst sentence.") {
+    is(protect_item_prefixes($input, sub { 'HIDDEN' }, barrier => qr/%comment/), $input,
+        'non-item commands, malformed labels, and barriers are preserved');
+}
 1;

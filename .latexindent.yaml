@@ -6,7 +6,18 @@ semantic_wrap:
 
 defaultIndent: '    '
 
+noAdditionalIndent:
+  item: 1
+  itemize: 1
+  enumerate: 1
+  description: 1
+
+noAdditionalIndentGlobal:
+  items: 1
+
 modifyLineBreaks:
+  items:
+    ItemFinishesWithLineBreak: -1
   oneSentencePerLine:
     manipulateSentences: 1
     removeSentenceLineBreaks: 1

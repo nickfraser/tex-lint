@@ -48,4 +48,7 @@ ok(exists $legacy_settings->{specialBeginEnd}{texLintParenMath}, '3.x receives p
 my $legacy_object = {body => 'Short sentence.', follows => "}new\n    "};
 TexLint::LatexIndentAdapter::_wrap_object($legacy_object, TexLint::Config->new, 1);
 is($legacy_object->{body}, '    Short sentence.', '3.x callback returns the first-line prefix consumed by upstream');
+ok(TexLint::LatexIndentAdapter::_inline_items({modifyLineBreaks => {items => {ItemFinishesWithLineBreak => -1}}}), 'native -1 enables inline items');
+ok(!TexLint::LatexIndentAdapter::_inline_items({modifyLineBreaks => {items => {ItemFinishesWithLineBreak => -1, item => {ItemFinishesWithLineBreak => 0}}}}), 'per-item setting takes precedence over the global item setting');
+ok(!TexLint::LatexIndentAdapter::_inline_items({}), 'inline items are opt-in through native YAML');
 1;

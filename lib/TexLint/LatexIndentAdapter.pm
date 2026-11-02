@@ -3,7 +3,7 @@ use strict;
 use warnings;
 no warnings 'once'; # Upstream package variables are deliberately fully qualified.
 use TexLint::Config;
-use TexLint::Protection qw(protect_commands);
+use TexLint::Protection qw(protect_commands protect_item_prefixes);
 use TexLint::SentenceWrap qw(wrap_sentence restore);
 
 sub _configure {
@@ -63,7 +63,24 @@ sub _inline_object {
     return 0 if $value =~ /\R|\\(?:newline|linebreak)(?![a-zA-Z])/;
     return 1 if ($object->{type} // '') eq 'command';
     return ($object->{type} // '') eq 'special'
-        && ($object->{name} // '') =~ /\A(?:inlineMath|texLintParenMath|texLintMacro)\z/;
+        && ($object->{name} // '') =~ /\A(?:inlineMath|texLintParenMath|texLintMacro|texLintItemPrefix)\z/;
+}
+
+sub _inline_items {
+    my ($settings) = @_;
+    my $items = $settings->{modifyLineBreaks}{items} // {};
+    my $per_item = ref($items->{item}) eq 'HASH' ? $items->{item} : {};
+    return ($per_item->{ItemFinishesWithLineBreak} // $items->{ItemFinishesWithLineBreak} // 0) eq '-1';
+}
+
+sub _store_atomic {
+    my ($value, $name) = @_;
+    my $object = bless {begin => '', body => $value, end => '', type => 'command', name => $name}, 'LatexIndent::Verbatim';
+    $object->create_unique_id;
+    # Restore before comments: macro arguments can contain comment IDs.
+    $object->{type} = 'special';
+    $LatexIndent::Verbatim::verbatimStorage{$object->{id}} = $object;
+    return $object->{id};
 }
 
 sub _wrap_object {
@@ -124,15 +141,10 @@ sub run {
     };
     local *{'LatexIndent::Document::one_sentence_per_line'} = sub {
         my ($self) = @_;
+        my %input = @_[1 .. $#_];
         my $storage = \%LatexIndent::Verbatim::verbatimStorage;
         $self->{body} = protect_commands($self->{body}, sub {
-            my ($value) = @_;
-            my $object = bless { begin => '', body => $value, end => '', type => 'command', name => 'texLintMacro' }, 'LatexIndent::Verbatim';
-            $object->create_unique_id;
-            # Restore before comments: macro arguments can contain comment IDs.
-            $object->{type} = 'special';
-            $storage->{$object->{id}} = $object;
-            return $object->{id};
+            return _store_atomic($_[0], 'texLintMacro');
         });
         my $sentence = $settings->{modifyLineBreaks}{oneSentencePerLine};
         my $tokens = \%LatexIndent::Tokens::tokens;
@@ -142,17 +154,25 @@ sub run {
         push @barriers, qr/\\\\/;
         push @barriers, '\\\\par(?![a-zA-Z])';
         push @barriers, $LatexIndent::TrailingComments::trailingCommentRegExp;
-        my @inline;
         my $protected = _protected_text();
-        for my $id (keys %$storage) {
+        for my $id (sort keys %$storage) {
             my $obj = $storage->{$id};
             my $value = restore($protected->{$id}, $protected);
-            if (!_inline_object($obj, $value)) {
-                push @barriers, quotemeta($id);
-            } else {
-                push @inline, quotemeta($id);
-            }
+            push @barriers, quotemeta($id) unless _inline_object($obj, $value);
         }
+        # In 3.x the early pass must keep real item commands visible to the
+        # normal item/indentation parser. Its final pass runs after indentation.
+        # 4.x stores sentence objects during the initial pass instead.
+        if (_inline_items($settings) && (!$legacy || $input{textWrap})) {
+            my $barrier = join '|', @barriers;
+            $self->{body} = protect_item_prefixes($self->{body}, sub {
+                return _store_atomic($_[0], 'texLintItemPrefix');
+            }, barrier => qr/$barrier/);
+        }
+        $protected = _protected_text();
+        my @inline = map { quotemeta($_) } grep {
+            _inline_object($storage->{$_}, restore($protected->{$_}, $protected))
+        } sort keys %$storage;
         my $old = $sentence->{sentencesDoNOTcontain}{other};
         push @barriers, "(?:$old)" if $old;
         local $sentence->{sentencesDoNOTcontain}{other} = join '|', @barriers;
