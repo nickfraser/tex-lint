@@ -63,8 +63,8 @@ available to the Perl interpreter running \code{tex-lint}.
 
 There is no project package-install or build step,
 and no Python environment is needed.
-With the runtime requirements available, run \code{bin/tex-lint} directly,
-or use \code{perl bin/tex-lint}.
+With the runtime requirements available,
+make \code{tex-lint} available on \code{PATH} as described below.
 
 \textbf{Verified integration:} \code{latexindent} \textbf{3.24.7},
 \code{latexmk} \textbf{4.87}, TeX Live \textbf{2025} (pdfLaTeX and LuaLaTeX),
@@ -85,6 +85,25 @@ The adapter checks the methods it needs and does not modify the installed tool.
 A standalone compiled \code{latexindent} binary without its Perl modules is not
 a supported backend.
 
+\section{Install tex-lint on PATH}
+
+From the repository root, create a symlink in your user-local executable directory:
+
+\begin{verbatim}
+mkdir -p "$HOME/.local/bin"
+ln -s "$PWD/bin/tex-lint" "$HOME/.local/bin/tex-lint"
+export PATH="$HOME/.local/bin:$PATH"
+tex-lint --help
+\end{verbatim}
+
+Add the \code{export PATH=...} line to your shell's startup file to persist it
+across sessions.
+The symlink points to this checkout,
+allowing the command to locate its \code{lib/} and \code{libexec/} supporting
+files.
+Keep the checkout at that location, or recreate the symlink after moving it.
+The examples below assume \code{tex-lint} is on \code{PATH}.
+
 \section{Locate TeX Live}
 
 Once installation under \code{~/.local/texlive} is complete,
@@ -94,13 +113,13 @@ Then check the backend:
 
 \begin{verbatim}
 latexindent --version
-bin/tex-lint --help
+tex-lint --help
 \end{verbatim}
 
 Alternatively, select the script explicitly:
 
 \begin{verbatim}
-bin/tex-lint --latexindent /absolute/path/to/latexindent.pl document.tex
+tex-lint --latexindent /absolute/path/to/latexindent.pl document.tex
 \end{verbatim}
 
 Setting \code{LATEXINDENT=/absolute/path/to/latexindent.pl} provides the same
@@ -116,9 +135,9 @@ sufficient.
 Like \code{mdformat-semantic-wrap}, file inputs are \textbf{formatted in place by default}:
 
 \begin{verbatim}
-bin/tex-lint document.tex
-bin/tex-lint chapters/ appendix.tex
-bin/tex-lint --check document.tex
+tex-lint document.tex
+tex-lint chapters/ appendix.tex
+tex-lint --check document.tex
 \end{verbatim}
 
 Directories are searched recursively for \code{.tex} files in deterministic
@@ -133,9 +152,9 @@ For an explicitly supplied directory symlink, its contents are searched.
 Use a separate output file or stdout to preview:
 
 \begin{verbatim}
-bin/tex-lint --output document-formatted.tex document.tex
-bin/tex-lint --output - document.tex
-bin/tex-lint - < document.tex > document-formatted.tex
+tex-lint --output document-formatted.tex document.tex
+tex-lint --output - document.tex
+tex-lint - < document.tex > document-formatted.tex
 \end{verbatim}
 
 The \code{-} input must be the only input;
@@ -173,7 +192,7 @@ examples.
 Run these commands from the repository root:
 
 \begin{verbatim}
-bin/tex-lint --check examples/README.tex
+tex-lint --check examples/README.tex
 latexmk -norc -r examples/latexmkrc -lualatex examples/README.tex
 \end{verbatim}
 
@@ -183,7 +202,7 @@ to \code{.ocs/examples/}.
 To preview the formatter's effect on a copy, use:
 
 \begin{verbatim}
-bin/tex-lint --output .ocs/examples/README-formatted.tex examples/README.tex
+tex-lint --output .ocs/examples/README-formatted.tex examples/README.tex
 \end{verbatim}
 
 After a normal build, the output directory already exists.
@@ -219,7 +238,7 @@ the conditional punctuation policy requires \code{tex-lint}.
 CLI options override the corresponding \code{semantic_wrap} settings:
 
 \begin{verbatim}
-bin/tex-lint \
+tex-lint \
   --semantic-wrap-soft-width 72 \
   --semantic-wrap-hard-width 88 \
   --semantic-wrap-preferred-markers ',;:' \
@@ -324,7 +343,7 @@ boundaries.
 An empty marker string disables punctuation preference:
 
 \begin{verbatim}
-bin/tex-lint --semantic-wrap-preferred-markers '' document.tex
+tex-lint --semantic-wrap-preferred-markers '' document.tex
 \end{verbatim}
 
 Only ordinary spaces and tabs are breakable; nonbreaking spaces are not.
@@ -457,7 +476,7 @@ success.
 
 \section{Pre-commit}
 
-The repository includes a local system-language hook:
+Use a local system-language hook to run the command installed on \code{PATH}:
 
 \begin{verbatim}
 repos:
@@ -465,18 +484,20 @@ repos:
     hooks:
       - id: tex-lint
         name: Semantic LaTeX wrapping
-        entry: bin/tex-lint
+        entry: tex-lint
         language: system
         files: '\.tex$'
         exclude: ^tests/fixtures/
 \end{verbatim}
 
-It uses the checkout and the current \code{PATH}/\code{LATEXINDENT},
-formatting matching files in place.
-When using the hook in another repository,
-set \code{entry} to this checkout's absolute \code{bin/tex-lint} path.
-This checkout excludes its deliberately unformatted regression fixtures from the
-hook so their source layout remains part of the test input.
+The hook formats matching files in place and uses the current
+\code{PATH}/\code{LATEXINDENT}.
+Ensure \code{tex-lint} is on the \code{PATH} inherited by pre-commit,
+including when invoked from an editor.
+This repository's own hook uses \code{entry: bin/tex-lint} to exercise the
+current checkout directly.
+It excludes deliberately unformatted regression fixtures so their source layout
+remains part of the test input.
 
 \section{Source layout}
 

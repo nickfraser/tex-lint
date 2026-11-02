@@ -18,8 +18,8 @@ indentation, rather than typeset text.
   available to the Perl interpreter running `tex-lint`.
 
 There is no project package-install or build step, and no Python environment is
-needed. With the runtime requirements available, run `bin/tex-lint` directly,
-or use `perl bin/tex-lint`.
+needed. With the runtime requirements available, make `tex-lint` available on
+`PATH` as described below.
 
 **Verified integration:** `latexindent` **3.24.7**, `latexmk` **4.87**, TeX Live
 **2025** (pdfLaTeX and LuaLaTeX), and Poppler **25.07.0**. The full suite passes
@@ -35,6 +35,23 @@ interface; it has callback unit tests but has not been verified against a real
 the installed tool. A standalone compiled `latexindent` binary without its Perl
 modules is not a supported backend.
 
+## Install tex-lint on PATH
+
+From the repository root, create a symlink in your user-local executable directory:
+
+```bash
+mkdir -p "$HOME/.local/bin"
+ln -s "$PWD/bin/tex-lint" "$HOME/.local/bin/tex-lint"
+export PATH="$HOME/.local/bin:$PATH"
+tex-lint --help
+```
+
+Add the `export PATH=...` line to your shell's startup file to persist it across
+sessions. The symlink points to this checkout, allowing the command to locate
+its `lib/` and `libexec/` supporting files. Keep the checkout at that location,
+or recreate the symlink after moving it. The examples below assume `tex-lint`
+is on `PATH`.
+
 ## Locate TeX Live
 
 Once installation under `~/.local/texlive` is complete, add the installation's
@@ -42,13 +59,13 @@ actual platform-specific `bin` directory to `PATH`. Then check the backend:
 
 ```bash
 latexindent --version
-bin/tex-lint --help
+tex-lint --help
 ```
 
 Alternatively, select the script explicitly:
 
 ```bash
-bin/tex-lint --latexindent /absolute/path/to/latexindent.pl document.tex
+tex-lint --latexindent /absolute/path/to/latexindent.pl document.tex
 ```
 
 `LATEXINDENT=/absolute/path/to/latexindent.pl` provides the same selection without
@@ -62,9 +79,9 @@ under a different interpreter is not sufficient.
 Like `mdformat-semantic-wrap`, file inputs are **formatted in place by default**:
 
 ```bash
-bin/tex-lint document.tex
-bin/tex-lint chapters/ appendix.tex
-bin/tex-lint --check document.tex
+tex-lint document.tex
+tex-lint chapters/ appendix.tex
+tex-lint --check document.tex
 ```
 
 Directories are searched recursively for `.tex` files in deterministic order.
@@ -76,9 +93,9 @@ once. For an explicitly supplied directory symlink, its contents are searched.
 Use a separate output file or stdout to preview:
 
 ```bash
-bin/tex-lint --output document-formatted.tex document.tex
-bin/tex-lint --output - document.tex
-bin/tex-lint - < document.tex > document-formatted.tex
+tex-lint --output document-formatted.tex document.tex
+tex-lint --output - document.tex
+tex-lint - < document.tex > document-formatted.tex
 ```
 
 `-` must be the only input; `--output` requires a single resolved input file.
@@ -107,7 +124,7 @@ Run these commands from the repository root to check it and build a PDF
 with LuaLaTeX:
 
 ```bash
-bin/tex-lint --check examples/README.tex
+tex-lint --check examples/README.tex
 latexmk -norc -r examples/latexmkrc -lualatex examples/README.tex
 ```
 
@@ -116,7 +133,7 @@ keeps auxiliary files and TeX/font caches under `.ocs/examples/`. After building
 preview formatting on a separate copy with:
 
 ```bash
-bin/tex-lint --output .ocs/examples/README-formatted.tex examples/README.tex
+tex-lint --output .ocs/examples/README-formatted.tex examples/README.tex
 ```
 
 The compilation suite additionally reformats the example at 40/55 widths and
@@ -148,7 +165,7 @@ conditional punctuation policy requires `tex-lint`.
 CLI options override the corresponding `semantic_wrap` settings:
 
 ```bash
-bin/tex-lint \
+tex-lint \
   --semantic-wrap-soft-width 72 \
   --semantic-wrap-hard-width 88 \
   --semantic-wrap-preferred-markers ',;:' \
@@ -240,7 +257,7 @@ enabled, TeX's standalone `--` and `---` spellings are also preferred boundaries
 An empty marker string disables punctuation preference:
 
 ```bash
-bin/tex-lint --semantic-wrap-preferred-markers '' document.tex
+tex-lint --semantic-wrap-preferred-markers '' document.tex
 ```
 
 Only ordinary spaces and tabs are breakable; nonbreaking spaces are not.
@@ -349,7 +366,7 @@ artifacts are ignored by Git and can be inspected after a failure or success.
 
 ## Pre-commit
 
-The repository includes a local system-language hook:
+Use a local system-language hook to run the command installed on `PATH`:
 
 ```yaml
 repos:
@@ -357,17 +374,17 @@ repos:
     hooks:
       - id: tex-lint
         name: Semantic LaTeX wrapping
-        entry: bin/tex-lint
+        entry: tex-lint
         language: system
         files: '\.tex$'
         exclude: ^tests/fixtures/
 ```
 
-It uses the checkout and the current `PATH`/`LATEXINDENT`, formatting matching
-files in place. When using the hook in another repository, set `entry` to this
-checkout's absolute `bin/tex-lint` path.
-This checkout excludes its deliberately unformatted regression fixtures from
-the hook so their source layout remains part of the test input.
+The hook formats matching files in place and uses the current `PATH`/`LATEXINDENT`.
+Ensure `tex-lint` is on the `PATH` inherited by pre-commit, including when invoked
+from an editor. This repository's own hook uses `entry: bin/tex-lint` to exercise
+the current checkout directly. It excludes deliberately unformatted regression
+fixtures so their source layout remains part of the test input.
 
 ## Source layout
 
