@@ -230,8 +230,8 @@ semantic_wrap:
 defaultIndent: '    '
 \end{verbatim}
 
-The checkout's configuration also contains the baseline \code{modifyLineBreaks}
-settings from the original design note, \code{latexindent_sentence_wrapping.md}.
+The checkout's configuration also enables sentence detection and wrapping after
+indentation through \code{modifyLineBreaks}.
 Running ordinary \code{latexindent -m -l} uses the baseline width wrapping;
 the conditional punctuation policy requires \code{tex-lint}.
 

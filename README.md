@@ -157,8 +157,8 @@ semantic_wrap:
 defaultIndent: '    '
 ```
 
-The checkout's configuration also contains the baseline `modifyLineBreaks`
-settings from the [original design note](latexindent_sentence_wrapping.md).
+The checkout's configuration also enables sentence detection and wrapping after
+indentation through `modifyLineBreaks`.
 Running ordinary `latexindent -m -l` uses the baseline width wrapping; the
 conditional punctuation policy requires `tex-lint`.
 
