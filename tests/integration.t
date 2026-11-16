@@ -13,9 +13,12 @@ if (!$backend) {
     my $settings = "$dir/.latexindent.yaml";
     write_text($settings, "semantic_wrap:\n  soft_width: 20\n  hard_width: 26\n  preferred_markers: ',;:-–—'\ndefaultIndent: '    '\n");
     my @base = ('--latexindent', $backend);
+    my ($status, $out, $err) = run_cli($dir, '', @base, '--doctor');
+    is($status, 0, 'doctor accepts real backend and its Perl dependencies');
+    like($out, qr/Ready to format LaTeX/, 'real backend passes doctor compatibility checks');
     my $prose = "One, two three, four five six seven. Another sentence.\n";
     my $expected = "One, two three,\nfour five six seven.\nAnother sentence.\n";
-    my ($status, $out, $err) = run_cli($dir, $prose, @base, '-');
+    ($status, $out, $err) = run_cli($dir, $prose, @base, '-');
     die "Real latexindent integration could not start:\n$err" if $status != 0;
     is($status, 0, 'real backend accepts stdin');
     is($out, $expected, 'real sentence pipeline uses soft-target core');

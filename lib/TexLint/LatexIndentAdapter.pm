@@ -3,6 +3,7 @@ use strict;
 use warnings;
 no warnings 'once'; # Upstream package variables are deliberately fully qualified.
 use TexLint::Config;
+use TexLint::Backend;
 use TexLint::Protection qw(protect_commands protect_item_prefixes);
 use TexLint::SentenceWrap qw(wrap_sentence restore);
 
@@ -104,8 +105,7 @@ sub run {
     local $FindBin::Bin = $backend_dir;
     local $FindBin::Script = 'latexindent.pl';
     local @INC = ($backend_dir, @INC);
-    eval { require LatexIndent::Document; 1 }
-        or die "Cannot load latexindent's Perl modules: $@";
+    TexLint::Backend->load($options{backend});
     # -d would also suppress -l. Instead use an isolated indentconfig containing
     # only the chosen project file, preventing implicit home-directory settings.
     if ($options{settings}) {
@@ -119,12 +119,6 @@ sub run {
     YAML::Tiny->new({paths => $options{settings} ? [$options{settings}] : []})->write($isolated)
         or die "Cannot write isolated latexindent settings: " . YAML::Tiny->errstr . "\n";
     local $ENV{LATEXINDENT_CONFIG} = $isolated;
-    for my $method (qw(yaml_read_settings one_sentence_per_line text_wrap)) {
-        die "Unsupported latexindent interface: missing $method\n"
-            unless LatexIndent::Document->can($method);
-    }
-    die "Unsupported latexindent interface: verbatim objects unavailable\n"
-        unless LatexIndent::Verbatim->can('create_unique_id');
     my $legacy = !LatexIndent::Sentence->can('mlb_one_sentence_per_line_indent');
     my $settings = $legacy ? \%LatexIndent::GetYamlSettings::mainSettings
         : \%LatexIndent::GetYamlSettings::mainSetting;

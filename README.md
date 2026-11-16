@@ -59,7 +59,7 @@ actual platform-specific `bin` directory to `PATH`. Then check the backend:
 
 ```bash
 latexindent --version
-tex-lint --help
+tex-lint --doctor
 ```
 
 Alternatively, select the script explicitly:
@@ -73,6 +73,27 @@ repeating the option. The formatter resolves executable symlinks so the adjacent
 upstream Perl modules and settings can be loaded. The backend runs under the
 same Perl interpreter as the formatter; a successful standalone version check
 under a different interpreter is not sufficient.
+
+### Check runtime dependencies
+
+```bash
+tex-lint --doctor
+tex-lint --doctor --latexindent /absolute/path/to/latexindent.pl
+```
+
+`--doctor` reports the running Perl interpreter (5.32 or newer), the resolved
+backend path, Perl dependency availability, and the backend's modules, default
+settings, and required adapter methods. It uses the same backend selection as
+formatting: `--latexindent`, then `LATEXINDENT`, then `latexindent` or
+`latexindent.pl` on `PATH`. Perl dependencies are checked using the interpreter
+running `tex-lint`, rather than the backend script's shebang.
+
+The report goes to stdout, with `OK` or `FAIL` for each check and details for
+failures. The command exits `0` when ready or `2` if a required check fails.
+It requires no input files, creates no scratch files, and accepts no formatting
+options. It does not execute the backend CLI or format a document. Compilation
+test tools such as `latexmk`, TeX engines, and Poppler are not runtime requirements
+and are not checked.
 
 ## Format and check
 
@@ -107,7 +128,7 @@ Exit statuses:
 
 | Status | Meaning |
 | --- | --- |
-| `0` | Formatting succeeded, or every input already passes `--check`. |
+| `0` | Formatting succeeded, every input passes `--check`, or `--doctor` passed. |
 | `1` | `--check` found unformatted input. No files were changed. |
 | `2` | Invalid arguments/configuration, unavailable backend, or another error. |
 
@@ -389,6 +410,8 @@ fixtures so their source layout remains part of the test input.
 ## Source layout
 
 - `bin/tex-lint`: input discovery, CLI, check/write/output workflow.
+- `lib/TexLint/Backend.pm`: shared backend discovery and compatibility checks.
+- `lib/TexLint/Doctor.pm`: isolated runtime dependency diagnostics.
 - `lib/TexLint/Config.pm`: shared setting validation.
 - `lib/TexLint/SentenceWrap.pm`: independent display-column wrapping core.
 - `lib/TexLint/Protection.pm`: balanced macro-argument protection.

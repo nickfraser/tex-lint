@@ -18,7 +18,7 @@ if ($integration || $compile) {
 $ENV{TEX_LINT_COMPILE} = 1 if $compile;
 binmode STDOUT, ':encoding(UTF-8)';
 $TexLintTest::root = dirname(dirname(abs_path(__FILE__)));
-for my $test (qw(config wrapping protection adapter cli integration items compilation)) {
+for my $test (qw(config wrapping protection adapter cli doctor integration items compilation)) {
     my $result = do "$TexLintTest::root/tests/$test.t";
     die "Cannot run $test.t: " . ($@ || $!) unless defined $result;
 }

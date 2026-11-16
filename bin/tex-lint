@@ -10,14 +10,17 @@ use File::Temp qw(tempdir);
 use File::Path qw(make_path);
 use Encode qw(decode encode FB_CROAK);
 use TexLint::Config;
+use TexLint::Backend;
 
 sub help {
     print <<'HELP';
 Usage: tex-lint [OPTIONS] PATH [PATH ...]
+       tex-lint --doctor [--latexindent PATH]
 Format LaTeX files in place; directories are searched recursively for *.tex.
 Use - to read UTF-8 stdin and write formatted text to stdout.
 
   --check                             Report differences without editing (exit 1)
+  --doctor                            Check runtime dependencies (exit 0 or 2)
   --semantic-wrap-soft-width N         Soft display-column target (default: 80)
   --semantic-wrap-hard-width N         Hard breakable width (default: 100)
   --semantic-wrap-preferred-markers S  Punctuation characters (default: ,;:-–—)
@@ -45,20 +48,6 @@ sub write_bytes {
     open my $fh, '>:raw', $path or die "Cannot write $path: $!\n";
     print {$fh} $bytes or die "Cannot write $path: $!\n";
     close $fh or die "Cannot close $path: $!\n";
-}
-
-sub backend_path {
-    my ($requested) = @_;
-    my @names = defined($requested) ? ($requested) : ('latexindent', 'latexindent.pl');
-    for my $name (@names) {
-        my @paths = $name =~ m{/} ? ($name) : map { File::Spec->catfile($_, $name) } File::Spec->path;
-        for my $path (@paths) {
-            next unless -f $path && -r $path && (-x $path || defined $requested);
-            return abs_path($path);
-        }
-    }
-    die "latexindent is unavailable. Add TeX Live's bin directory to PATH, or pass\n"
-        . "--latexindent /path/to/latexindent.pl (LATEXINDENT is also supported).\n";
 }
 
 sub collect_files {
@@ -113,6 +102,7 @@ sub main {
     my (%options, %overrides);
     GetOptions(
         'check' => \$options{check}, 'help|h' => \$options{help}, 'version' => \$options{version},
+        'doctor' => \$options{doctor},
         'config=s' => \$options{config}, 'latexindent=s' => \$options{backend},
         'output|o=s' => \$options{output},
         'semantic-wrap-soft-width=s' => \$overrides{soft_width},
@@ -122,6 +112,13 @@ sub main {
     ) or die "Use --help for usage.\n";
     if ($options{help}) { help(); return 0; }
     if ($options{version}) { print "tex-lint 0.1.0\n"; return 0; }
+    if ($options{doctor}) {
+        die "--doctor accepts only --latexindent; omit inputs and formatting options.\n"
+            if @ARGV || $options{check} || defined($options{output}) || defined($options{config})
+                || grep { defined $_ } values %overrides;
+        require TexLint::Doctor;
+        return TexLint::Doctor->run($options{backend} // $ENV{LATEXINDENT});
+    }
     die "Provide at least one input path, or - for stdin.\n" unless @ARGV;
     die "--check and --output cannot be combined.\n" if $options{check} && defined $options{output};
     %overrides = map { $_ => $overrides{$_} } grep { defined $overrides{$_} } keys %overrides;
@@ -152,7 +149,7 @@ sub main {
         die "Configuration is not a readable file: $options{config}\n" unless -f $options{config} && -r _;
         $options{config} = abs_path($options{config});
     }
-    my $backend = backend_path($options{backend} // $ENV{LATEXINDENT});
+    my $backend = TexLint::Backend->resolve($options{backend} // $ENV{LATEXINDENT});
     my $root = getcwd();
     my $scratch_root = File::Spec->catdir($root, '.ocs', 'tex-lint');
     make_path($scratch_root);

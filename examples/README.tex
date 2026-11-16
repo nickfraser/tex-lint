@@ -113,7 +113,7 @@ Then check the backend:
 
 \begin{verbatim}
 latexindent --version
-tex-lint --help
+tex-lint --doctor
 \end{verbatim}
 
 Alternatively, select the script explicitly:
@@ -129,6 +129,31 @@ and settings can be loaded.
 The backend runs under the same Perl interpreter as the formatter;
 a successful standalone version check under a different interpreter is not
 sufficient.
+
+\subsection{Check runtime dependencies}
+
+\begin{verbatim}
+tex-lint --doctor
+tex-lint --doctor --latexindent /absolute/path/to/latexindent.pl
+\end{verbatim}
+
+The \code{--doctor} option reports the running Perl interpreter (5.32 or newer),
+the resolved backend path, Perl dependency availability,
+and the backend's modules, default settings, and required adapter methods.
+It uses the same backend selection as formatting: \code{--latexindent},
+then \code{LATEXINDENT},
+then \code{latexindent} or \code{latexindent.pl} on \code{PATH}.
+Perl dependencies are checked using the interpreter running \code{tex-lint},
+rather than the backend script's shebang.
+
+The report goes to stdout,
+with \code{OK} or \code{FAIL} for each check and details for failures.
+The command exits \code{0} when ready or \code{2} if a required check fails.
+It requires no input files, creates no scratch files,
+and accepts no formatting options.
+It does not execute the backend CLI or format a document.
+Compilation test tools such as \code{latexmk}, TeX engines,
+and Poppler are not runtime requirements and are not checked.
 
 \section{Format and check}
 
@@ -169,7 +194,7 @@ Existing file permissions are preserved when writing in place.
 \toprule
 Status & Meaning \\
 \midrule
-\code{0} & Formatting succeeded, or every input already passes \code{--check}. \\
+\code{0} & Formatting succeeded, every input passes \code{--check}, or \code{--doctor} passed. \\
 \code{1} & \code{--check} found unformatted input. No files were changed. \\
 \code{2} & Invalid arguments/configuration, unavailable backend, or another error. \\
 \bottomrule
@@ -504,6 +529,9 @@ remains part of the test input.
 \begin{description}
 \item[\code{bin/tex-lint}] Input discovery, CLI,
 and the check/write/output workflow.
+\item[\code{lib/TexLint/Backend.pm}] Shared backend discovery and compatibility
+checks.
+\item[\code{lib/TexLint/Doctor.pm}] Isolated runtime dependency diagnostics.
 \item[\code{lib/TexLint/Config.pm}] Shared setting validation.
 \item[\code{lib/TexLint/SentenceWrap.pm}] Independent display-column wrapping
 core.
